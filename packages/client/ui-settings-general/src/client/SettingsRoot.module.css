@@ -101,7 +101,7 @@
 }
 
 /* Nav rail (figma .Setting-nav 501:29958): 188 wide, pad (12,22,12,0),
-   gap 18, no own fill â€” the panel white shows through. */
+   gap 18, no own fill ¡ª the panel white shows through. */
 .nav {
   flex: none;
   display: flex;
@@ -143,8 +143,7 @@
   cursor: pointer;
   font-family: inherit;
   font-size: 14px;
-  line-height: 22px;
-  font-weight: 400;
+  line-height: 400;
   color: var(--dsw-alias-label-primary);
   text-align: left;
 }
@@ -184,7 +183,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  height: 54px;
+  min-height: 54px;
   padding: 20px 14px 8px 10px;
   box-sizing: border-box;
 }
@@ -223,6 +222,11 @@
   min-height: 0;
   padding: 0 24px 24px;
   overflow-y: auto;
+  /* `overflow-wrap: anywhere` keeps the panel content from breaking to one
+     character per line when a narrow viewport leaves the inner column with
+     only a handful of pixels between the row's `padding-right` and its
+     control. The break would otherwise happen at every CJK boundary. */
+  overflow-wrap: anywhere;
 }
 
 /* Visually-hidden text seat (close button accessible name from slot content). */
@@ -233,4 +237,67 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* Phone-sized viewports stack the nav rail above the content: the 188px fixed
+   nav would otherwise consume most of a 360px viewport and leave the content
+   column with only a few characters of width, breaking every row title to
+   one glyph per line. The stack keeps the existing visual rhythm by promoting
+   the nav to a horizontal scroller and collapsing the panel's chrome. The
+   breakpoint matches AppFrame's MOBILE_DRAWER_BREAKPOINT so a panel opened
+   from a phone drawer lines up with the rest of the mobile composition. */
+@media (max-width: 680px) {
+  .panel {
+    flex-direction: column;
+    width: calc(100vw - 32px);
+    height: calc(100vh - 32px);
+    max-width: calc(100vw - 32px);
+    border-radius: 24px;
+  }
+
+  .nav {
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    padding: 12px 12px 8px;
+    gap: 8px;
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+    flex: none;
+  }
+
+  .navTitle {
+    display: none;
+  }
+
+  .navList {
+    flex-direction: row;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    gap: 6px;
+  }
+
+  .navList::-webkit-scrollbar {
+    display: none;
+  }
+
+  .navCell {
+    flex: none;
+    height: 32px;
+    padding: 4px 12px;
+    font-size: 13px;
+    line-height: 18px;
+    border-radius: 999px;
+    corner-shape: round;
+  }
+
+  .navLabel {
+    overflow: visible;
+  }
+
+  .options {
+    padding: 0 16px 16px;
+  }
 }

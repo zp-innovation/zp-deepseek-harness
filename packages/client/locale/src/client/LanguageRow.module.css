@@ -1,4 +1,4 @@
-/* Language row (figma 'Setting-Cell': gap 8, pad 16/0, hairline separator;
+﻿/* Language row (figma 'Setting-Cell': gap 8, pad 16/0, hairline separator;
  * the section column removes the separator on its last child). */
 
 .row {
@@ -48,4 +48,26 @@
 
 .chevron {
   flex: none;
+}
+
+/* Phone-sized viewports stack the row text above its control: the fixed
+   `padding-right: 48px` reserves space for the selector/stepper, but a
+   narrow content column (the settings panel stacks its nav on top below
+   the 680 mobile breakpoint) would otherwise leave only a handful of
+   pixels between the reservation and the control, breaking every title to
+   one glyph per line. The column switch drops the reservation and lets
+   each side take its own row. */
+@media (max-width: 680px) {
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .rowText {
+    padding-right: 0;
+  }
+  .control,
+  .selector {
+    align-self: flex-start;
+  }
 }
