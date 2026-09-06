@@ -91,6 +91,22 @@ afterEach(() => {
 })
 
 describe('BrowserAuth', () => {
+  it('requires password cookies and omits launch tokens in password-only mode', async () => {
+    const store = new RecordCredentials()
+    const owner = {}
+    const legacy = await createAuth(store, 30, owner)
+    const old = exchange(legacy)
+    const auth = await BrowserAuth.create(owner, credentials(store), 30, true)
+    expect(auth.authenticatedUrl('http://127.0.0.1:3080')).toBe('http://127.0.0.1:3080/')
+    expect(auth.isAuthenticated(request('/', '127.0.0.1:3080', { cookie: old.cookie }))).toBe(false)
+    const denied = response()
+    expect(auth.authorizeIndex(request(old.launchUrl), denied.value)).toBe(false)
+    expect(denied.state.status).toBe(401)
+    expect(denied.state.headers?.['set-cookie']).toBeUndefined()
+    const cookie = auth.createSessionCookie('127.0.0.1:3080').split(';', 1)[0]!
+    expect(auth.isAuthenticated(request('/', '127.0.0.1:3080', { cookie }))).toBe(true)
+  })
+
   it('mints one process token and a persistent authority-bound cookie', async () => {
     const store = new RecordCredentials()
     const processOwner = {}
@@ -159,11 +175,10 @@ describe('BrowserAuth', () => {
       expect(denied.state.status).toBe(401)
       expect(denied.state.headers).toEqual({
         'cache-control': 'no-store',
-        'content-type': 'text/plain; charset=utf-8',
+        'content-type': 'text/html; charset=utf-8',
       })
-      expect(denied.state.body).toBe(candidate.method === 'HEAD'
-        ? undefined
-        : 'dsh web authentication required; reopen the URL printed by dsh web.\n')
+      if (candidate.method === 'HEAD') expect(denied.state.body).toBeUndefined()
+      else expect(denied.state.body).toContain('<form id="loginForm">')
     }
   })
 

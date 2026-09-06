@@ -34,6 +34,20 @@
   --dsh-composer-dock-inset: 8px;
 }
 
+/* The desktop transcript's 680px reading-width floor overflows a phone-sized
+   column. Keep messages and the composer inside the mobile viewport; desktop
+   width preferences remain available when the viewport grows again. */
+@media (max-width: 680px) {
+  .root {
+    --dsh-chat-content-width: calc(100% - 2 * var(--dsh-composer-side-clearance));
+    --dsh-composer-card-max-width: 100%;
+  }
+
+  .widthHandle {
+    display: none;
+  }
+}
+
 .header {
   position: relative;
   flex: none;

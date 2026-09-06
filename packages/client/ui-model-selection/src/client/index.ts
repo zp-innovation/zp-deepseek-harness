@@ -22,6 +22,8 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { ModelDirectory } from './directory.ts'
 import type { ModelDirectoryState } from './directory.ts'
 import { ModelDirectoryResolver } from './service.ts'
 import type { ModelSelectInjected } from './slots.ts'
@@ -162,17 +164,48 @@ export function apply(ctx: ClientContext): void {
       name: 'conversation.input.model',
       locale: NS,
       inject: (sessionId): ModelSelectInjected => {
-        const directory = models.directoryFor(sessionId)
+        // The directory needs `ctx.remote.session`, which may not be ready the
+        // moment the slot mounts. Resolve it on demand so a transient lookup
+        // failure does not break the whole conversation view.
+        let cached: ModelDirectory | undefined
+        const getDirectory = (): ModelDirectory => {
+          if (cached === undefined) cached = models.directoryFor(sessionId)
+          return cached
+        }
         const available = sessions.subagentAddress(sessionId) === undefined
+        // Wrap the directory lookup so a missing 'ctx.remote.session' surfaces
+        // as a silent model-seat failure instead of crashing the whole chat
+        // view. The proxy only resolves the underlying store for store-shaped
+        // properties (the framework probes 'hooks' / 'keyedHooks' on every
+        // inject face and must not trigger the lazy directory).
+        const storeProps = new Set(['subscribe', 'getSnapshot', 'getServerSnapshot'])
+        const safeDirectory = (): ModelDirectory | undefined => {
+          try { return getDirectory() } catch { return undefined }
+        }
+        const directoryStore = new Proxy({} as SnapshotStore<ModelDirectoryState>, {
+          get(_target, prop, receiver) {
+            if (typeof prop !== 'string' || !storeProps.has(prop)) return undefined
+            const dir = safeDirectory()
+            if (dir === undefined) return undefined
+            const value = Reflect.get(dir.store, prop, receiver)
+            return typeof value === 'function' ? value.bind(dir.store) : value
+          },
+        })
         return {
           available,
-          directory: directory.store,
+          directory: directoryStore,
           load: () => {
-            if (available) directory.load().catch(() => { /* surfaced on the store */ })
+            if (!available) return
+            const dir = safeDirectory()
+            if (dir === undefined) return
+            dir.load().catch(() => { /* surfaced on the store */ })
           },
-          select: (selection: ModelSelection) => available
-            ? directory.select(selection).then(() => true, () => false)
-            : Promise.resolve(false),
+          select: (selection: ModelSelection) => {
+            if (!available) return Promise.resolve(false)
+            const dir = safeDirectory()
+            if (dir === undefined) return Promise.resolve(false)
+            return dir.select(selection).then(() => true, () => false)
+          },
         }
       },
     }, ModelSelect))

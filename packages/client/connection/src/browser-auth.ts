@@ -25,6 +25,7 @@ interface StoredSecretPayload {
 }
 
 interface BrowserCookiePayload {
+  readonly authentication?: 'password'
   readonly version: typeof COOKIE_PAYLOAD_VERSION
   readonly authority: string
   readonly issuedAt: number
@@ -67,7 +68,7 @@ function header(
 }
 
 /** Canonical request authority used as the cookie name and signed audience. */
-function requestAuthority(headers: ConnectionTrustRequest['headers']): string | undefined {
+export function requestAuthority(headers: ConnectionTrustRequest['headers']): string | undefined {
   const host = header(headers, 'host')
   if (host === undefined) return undefined
   try {
@@ -190,6 +191,7 @@ export class BrowserAuth {
     processOwner: object,
     private readonly secret: Buffer,
     maxAgeDays: number,
+    private readonly passwordOnly = false,
   ) {
     this.launchToken = processLaunchToken(processOwner)
     this.maxAgeMilliseconds = maxAgeDays * DAY_MILLISECONDS
@@ -205,27 +207,48 @@ export class BrowserAuth {
    * @param processOwner - root application context retaining one token across Connection reloads.
    * @param credentials - persistent credential provider for the Web profile.
    * @param maxAgeDays - positive absolute browser-cookie lifetime in days.
+   * @param passwordOnly - require a password-issued cookie and disable launch-token exchange.
    * @returns initialized authentication owner with the process owner's launch token.
    */
   static async create(
     processOwner: object,
     credentials: CredentialProvider,
     maxAgeDays: number,
+    passwordOnly = false,
   ): Promise<BrowserAuth> {
-    return new BrowserAuth(processOwner, await initializeSecret(credentials), maxAgeDays)
+    return new BrowserAuth(processOwner, await initializeSecret(credentials), maxAgeDays, passwordOnly)
+  }
+
+  /** Create an authority-bound session cookie after an account login. */
+  createSessionCookie(authority: string): string {
+    const issuedAt = Date.now()
+    const expiresAt = issuedAt + this.maxAgeMilliseconds
+    const value = encodeCookie({
+      authentication: 'password',
+      version: COOKIE_PAYLOAD_VERSION,
+      authority,
+      issuedAt,
+      expiresAt,
+    }, this.secret)
+    return sessionCookie(
+      cookieName(authority),
+      value,
+      expiresAt,
+      Math.floor(this.maxAgeMilliseconds / 1000),
+    )
   }
 
   /**
-   * Add this process's launch token to the ordinary application root URL.
+   * Return the application URL for this authentication mode.
    * @param baseUrl - canonical browser origin without credentials.
-   * @returns root URL carrying the process token as its sole authentication input.
+   * @returns clean root URL in password-only mode, otherwise a launch-token URL.
    */
   authenticatedUrl(baseUrl: string): string {
     const url = new URL(baseUrl)
     url.pathname = '/'
     url.search = ''
     url.hash = ''
-    url.searchParams.set(TOKEN_QUERY, this.launchToken)
+    if (!this.passwordOnly) url.searchParams.set(TOKEN_QUERY, this.launchToken)
     return url.href
   }
 
@@ -243,7 +266,7 @@ export class BrowserAuth {
     const tokens = url.searchParams.getAll(TOKEN_QUERY)
     if (tokens.length > 0) {
       const authority = requestAuthority(req.headers)
-      if (req.method === 'GET' && url.pathname === '/' && tokens.length === 1
+      if (!this.passwordOnly && req.method === 'GET' && url.pathname === '/' && tokens.length === 1
         && authority !== undefined && tokenMatches(tokens.join(''), this.launchToken)) {
         const issuedAt = Date.now()
         const expiresAt = issuedAt + this.maxAgeMilliseconds
@@ -294,6 +317,7 @@ export class BrowserAuth {
     if (value === undefined) return false
     const payload = decodeCookie(value, this.secret)
     if (payload === undefined || payload.authority !== authority) return false
+    if (this.passwordOnly && payload.authentication !== 'password') return false
     const now = Date.now()
     return payload.issuedAt <= now
       && payload.expiresAt > now
@@ -301,13 +325,78 @@ export class BrowserAuth {
       && payload.expiresAt - payload.issuedAt <= this.maxAgeMilliseconds
   }
 
-  private writeUnauthorized(req: ConnectionIndexRequest, res: ConnectionIndexResponse): void {
+  private writeLoginPage(req: ConnectionIndexRequest, res: ConnectionIndexResponse): void {
     res.writeHead(401, {
       'cache-control': 'no-store',
-      'content-type': 'text/plain; charset=utf-8',
+      'content-type': 'text/html; charset=utf-8',
     })
-    res.end(req.method === 'HEAD'
-      ? undefined
-      : 'dsh web authentication required; reopen the URL printed by dsh web.\n')
+    res.end(req.method === 'HEAD' ? undefined : `<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - DeepSeek Harness</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f5;min-height:100vh;display:flex;align-items:center;justify-content:center}
+    .login{background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.1);padding:40px;width:100%;max-width:400px}
+    .login h1{font-size:24px;font-weight:600;margin-bottom:8px;color:#1a1a2e;text-align:center}
+    .login p{color:#666;font-size:14px;margin-bottom:32px;text-align:center}
+    .form-group{margin-bottom:20px}
+    .form-group label{display:block;font-size:14px;font-weight:500;color:#333;margin-bottom:6px}
+    .form-group input{width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:15px;transition:border-color .2s}
+    .form-group input:focus{outline:none;border-color:#4f8ef7}
+    .btn{width:100%;padding:12px;background:#4f8ef7;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:500;cursor:pointer;transition:background .2s}
+    .btn:hover{background:#3a7be0}
+    .error{color:#e53e3e;font-size:13px;margin-top:12px;text-align:center;display:none}
+  </style>
+</head>
+<body>
+  <div class="login">
+    <h1>DeepSeek Harness</h1>
+    <p>请登录以继续</p>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">用户名</label>
+        <input type="text" id="username" name="username" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="password">密码</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn">登录</button>
+      <p id="errorMsg" class="error"></p>
+    </form>
+  </div>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const form = new FormData(this);
+      const btn = document.querySelector('.btn');
+      btn.disabled = true;
+      btn.textContent = '登录中...';
+      try {
+        const res = await fetch('/login', {method:'POST', body:new URLSearchParams(form)});
+        if (res.ok) { window.location.href = '/'; }
+        else {
+          const data = await res.json().catch(() => ({error:'登录失败，请检查用户名和密码'}));
+          const err = document.getElementById('errorMsg');
+          err.textContent = data.error || '登录失败，请检查用户名和密码';
+          err.style.display = 'block';
+        }
+      } catch {
+        document.getElementById('errorMsg').textContent = '登录失败，请稍后重试';
+        document.getElementById('errorMsg').style.display = 'block';
+      }
+      btn.disabled = false;
+      btn.textContent = '登录';
+    });
+  </script>
+</body>
+</html>`)
+  }
+
+  private writeUnauthorized(req: ConnectionIndexRequest, res: ConnectionIndexResponse): void {
+    this.writeLoginPage(req, res)
   }
 }

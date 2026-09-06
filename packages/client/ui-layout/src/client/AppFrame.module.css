@@ -20,13 +20,36 @@
   .frame {
     transition: none;
   }
+
+  .sidebarCol[data-mobile],
+  .frame[data-mobile] .detailsCol {
+    transition: none;
+  }
 }
 
 .sidebarCol {
   min-width: 0;
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
-  border-right: 0.5px solid var(--dsw-alias-border-l3);
+  border-right: 1px solid var(--dsw-alias-border-l1);
+}
+
+/* Phones reserve no permanent navigation rail: the drawer slides over the
+   conversation, so chat keeps the entire viewport width. */
+.sidebarCol[data-mobile] {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 30;
+  width: var(--dsh-mobile-drawer-width);
+  padding-left: env(safe-area-inset-left);
+  box-sizing: border-box;
+  box-shadow: var(--dsw-shadow-lv2);
+  transform: translateX(-100%);
+  transition: transform var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+.sidebarCol[data-mobile][data-mobile-open] {
+  transform: translateX(0);
 }
 
 .centerCol {
@@ -36,10 +59,62 @@
   overflow: hidden;
 }
 
+/* The mobile sidebar is absolutely positioned and no longer consumes the
+   first grid item; keep conversation on the flexible center track. */
+.frame[data-mobile] .centerCol {
+  grid-column: 2;
+}
+
 .detailsCol {
   min-width: 0;
   overflow: hidden;
-  border-left: 0.5px solid var(--dsw-alias-border-l3);
+  border-left: 1px solid var(--dsw-alias-border-l2);
+}
+
+/* Details use the matching right drawer below the mobile breakpoint. The
+   mounted subtree retains its state while the panel is dismissed. */
+.frame[data-mobile] .detailsCol {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 30;
+  width: min(380px, calc(100% - 32px));
+  background: var(--dsw-alias-bg-base);
+  box-shadow: var(--dsw-shadow-lv2);
+  transform: translateX(100%);
+  transition: transform var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+.frame[data-mobile][data-mobile-details-open] .detailsCol {
+  transform: translateX(0);
+}
+
+.mobileNavigationButton,
+.mobileBackdrop {
+  position: absolute;
+  border: none;
+}
+
+.mobileNavigationButton {
+  top: max(8px, env(safe-area-inset-top));
+  left: max(8px, env(safe-area-inset-left));
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 12px;
+  background: var(--dsw-alias-button-elevated-fill);
+  box-shadow: var(--dsw-shadow-lv2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.mobileBackdrop {
+  inset: 0;
+  z-index: 29;
+  width: 100%;
+  height: 100%;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 24%, transparent);
 }
 
 /* The details subtree stays mounted at zero width, so its border must not paint
@@ -86,7 +161,7 @@
   border-radius: 10px;
   box-sizing: border-box;
   background: var(--dsw-alias-button-floating-fill);
-  border: 0.5px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
   /* Hover affordance: the details pill hides until the pointer is over its
      column, the strip itself, or a drag. */
   opacity: 0;

@@ -51,6 +51,8 @@ function localBuildVersion(): string | undefined {
  */
 export function SidebarRoot({
   collapsed,
+  mobile,
+  closeMobileNavigation,
   width,
   startSession,
   toggleSidebar,
@@ -173,7 +175,10 @@ export function SidebarRoot({
             type="button"
             className={clsx(css.iconButton, css.toggle)}
             aria-label={collapsed ? t('toggle.open') : t('toggle.collapse')}
-            onClick={() => { toggleSidebar() }}
+            onClick={() => {
+              if (mobile) closeMobileNavigation?.()
+              else toggleSidebar()
+            }}
           >
             {!wide && (
               <span className={css.railMark} aria-hidden="true">
@@ -201,7 +206,19 @@ export function SidebarRoot({
 
       {/* The browsing region fills the column between the controls and the
           foot in both states; its rail icon column rides the same slot. */}
-      <div className={css.regionArea}>
+      <div
+        className={css.regionArea}
+        onClickCapture={(event) => {
+          // The phone-sized drawer covers the conversation; once the user
+          // picks a Session from the list, the drawer should yield so the
+          // selected chat is visible without a manual close.
+          if (!mobile) return
+          const target = event.target
+          if (!(target instanceof Element)) return
+          if (target.closest('[role="treeitem"]') === null) return
+          closeMobileNavigation()
+        }}
+      >
         {renderSlot('sidebar.workspaces', {
           wide,
           expandSidebar: () => { if (collapsed) toggleSidebar() },

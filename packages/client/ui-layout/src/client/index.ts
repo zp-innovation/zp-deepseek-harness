@@ -99,6 +99,10 @@ export interface SidebarOwnerProps {
   collapsed: boolean
   /** Rendered column width in px (SIDEBAR_COLLAPSED when collapsed). */
   width: number
+  /** True while the sidebar is an overlay drawer on a mobile viewport. */
+  mobile?: boolean
+  /** Dismiss the mobile drawer without changing the desktop width preference. */
+  closeMobileNavigation?: () => void
 }
 
 /** Conversation owner share: business state and actions belong to the registrant. */

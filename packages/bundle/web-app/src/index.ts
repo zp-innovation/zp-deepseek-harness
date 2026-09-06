@@ -132,11 +132,24 @@ try {
  * @returns the LAN display addresses and invocation-derived fence authorities.
  */
 export function resolveLanTrust(bindHost: string, extra: readonly string[]): WebRuntimeValues {
-  const lanAddresses = bindHost === ALL_INTERFACES_HOST
-    ? Object.values(networkInterfaces()).flat()
-      .filter((iface): iface is NonNullable<typeof iface> => iface !== undefined && iface.family === 'IPv4' && !iface.internal)
-      .map(iface => iface.address)
-    : []
+  // Collect all non-loopback IPv4 addresses on this machine
+  const allLanAddresses = Object.values(networkInterfaces()).flat()
+    .filter((iface): iface is NonNullable<typeof iface> => iface !== undefined && iface.family === 'IPv4' && !iface.internal)
+    .map(iface => iface.address)
+
+  let lanAddresses: string[]
+  if (bindHost === ALL_INTERFACES_HOST) {
+    // 0.0.0.0: expose all discovered LAN addresses
+    lanAddresses = allLanAddresses
+  } else if (bindHost === LOOPBACK_HOST) {
+    // 127.0.0.1: loopback only, no LAN access
+    lanAddresses = []
+  } else {
+    // Specific host (e.g. 192.168.1.100 or 0.0.0.0 for legacy callers):
+    // treat it as a declared LAN address if it matches one of our interfaces,
+    // otherwise include it as-is so remote/custom hosts are trusted too.
+    lanAddresses = allLanAddresses.includes(bindHost) ? [bindHost] : [bindHost]
+  }
   return { lanAddresses, trustedHosts: [...lanAddresses, ...extra] }
 }
 

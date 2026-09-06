@@ -35,7 +35,10 @@
   "license": "MIT",
   "dependencies": {
     "@deepseek-ai/dsh-credentials": "workspace:^",
+    "@deepseek-ai/dsh-home-paths": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^",
+    "bcryptjs": "^2.4.3",
+    "sql.js": "^1.11.0",
     "zod": "^4.4.3"
   },
   "files": [
@@ -54,6 +57,7 @@
     "@deepseek-ai/dsh-commands": "workspace:^",
     "@deepseek-ai/dsh-host-directory-picker": "workspace:^",
     "@deepseek-ai/dsh-host-webserver": "workspace:^",
+    "@deepseek-ai/dsh-home-paths": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-settings": "workspace:^",

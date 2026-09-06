@@ -180,10 +180,18 @@ export const InputBar = memo(function InputBar({
   // caret (restored at the draft's end) off screen.
   useEffect(() => {
     if (locked || editor === null) return
-    // Lexical's focus() restores the editor selection but never calls the DOM
-    // focus itself; preventScroll keeps the conversation scrollport still.
-    editor.getRootElement()?.focus({ preventScroll: true })
-    editor.focus(() => { revealSelection() })
+    // Mobile browsers open the soft keyboard the moment an editable surface
+    // receives focus, so the unlock-and-focus path that desktop relies on
+    // would pop the keyboard on a phone. Skip the auto-focus there and let
+    // the user tap the composer when they want it.
+    const coarsePointer = typeof window !== 'undefined'
+      && window.matchMedia?.('(pointer: coarse)').matches === true
+    if (!coarsePointer) {
+      // Lexical's focus() restores the editor selection but never calls the DOM
+      // focus itself; preventScroll keeps the conversation scrollport still.
+      editor.getRootElement()?.focus({ preventScroll: true })
+      editor.focus(() => { revealSelection() })
+    }
   }, [locked, sessionId, editor])
 
   // A persisted draft arrives AFTER the unlock effect: ConversationSession

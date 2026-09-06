@@ -177,6 +177,13 @@ interface ContinuationHost {
    * @returns the observer whose edges this epoch publishes.
    */
   observeActivation(provider: string, childId: SessionId, parent: Agent): ActivationObserver
+  /**
+   * Callbacks registered by external plugins (e.g. agent-teams) to install
+   * per-child runtime patches (model selection, fallback routing, etc.) when
+   * a continuable subagent is freshly created or cold-resumed.
+   * Each callback receives the child context and returns a dispose function.
+   */
+  readonly continuableSetupCallbacks: Array<(childCtx: Context) => () => void>
 }
 
 /**
@@ -398,11 +405,13 @@ export class SubagentContinuationManager {
    */
   private readonly closingScopes = new Map<Agent, Set<Agent>>()
   private draining = false
+  private readonly continuableSetupCallbacks: Array<(childCtx: Context) => () => void>
 
   constructor(
     private readonly ctx: Context,
     private readonly host: ContinuationHost,
   ) {
+    this.continuableSetupCallbacks = this.host.continuableSetupCallbacks
     // Ordinary Cordis owner effects unwind in reverse registration order, which
     // cannot express the dynamic child graph. Register the private scope's
     // structural disposer FIRST and the drain SECOND, so reverse unwind invokes
@@ -1270,6 +1279,13 @@ export class SubagentContinuationManager {
     // After transfer, any failure must dispose the created handle, remove the
     // Activation, and roll back parent ownership before rejecting.
     this.activations.set(childId, activation)
+    const childCtx = handle.agent.ctx
+    for (const cb of this.continuableSetupCallbacks) {
+      const dispose = cb(childCtx)
+      if (dispose) {
+        childCtx.effect(() => dispose, 'SubagentRuntime.continuableSetup')
+      }
+    }
     try {
       inputs.signal.throwIfAborted()
       this.assertAdmitting(parent)

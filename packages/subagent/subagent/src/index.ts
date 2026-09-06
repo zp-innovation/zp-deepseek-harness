@@ -196,6 +196,26 @@ export class SubagentRuntime extends TypertRemoteService {
    * composes into the carrier.
    */
   private readonly emitLifecycle: LifecycleEmitter
+  /**
+   * Callbacks registered by external plugins to install per-child runtime
+   * patches when a continuable subagent is freshly created or cold-resumed.
+   * @internal
+   */
+  readonly continuableSetupCallbacks: Array<(childCtx: Context) => () => void> = []
+  /**
+   * Register a callback to run when a continuable subagent is created or
+   * cold-resumed, receiving the child's Cordis context. The callback returns
+   * a dispose function that is called when the child agent is disposed.
+   * @param callback - called with the child context; return a dispose fn.
+   * @returns a disposer that removes the registered callback.
+   */
+  registerContinuableSetup(callback: (childCtx: Context) => () => void): () => void {
+    this.continuableSetupCallbacks.push(callback)
+    return () => {
+      const idx = this.continuableSetupCallbacks.indexOf(callback)
+      if (idx >= 0) this.continuableSetupCallbacks.splice(idx, 1)
+    }
+  }
 
   constructor(ctx: Context) {
     super(ctx, 'subagents')
@@ -204,6 +224,7 @@ export class SubagentRuntime extends TypertRemoteService {
       const manager = new SubagentContinuationManager(childCtx, {
         prepareContinuable: (name, request) => this.prepareContinuable(name, request),
         observeActivation: (provider, childId, parent) => this.observeActivation(provider, childId, parent),
+        continuableSetupCallbacks: this.continuableSetupCallbacks,
       })
       this.continuations = manager
       childCtx.effect(() => () => {

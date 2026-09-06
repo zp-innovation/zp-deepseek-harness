@@ -14,7 +14,10 @@
     "src/loopback-hostname.ts",
     "src/rpc-host.ts",
     "src/rpc-schema.ts",
-    "src/rpc.ts"
+    "src/rpc.ts",
+    "src/bcryptjs.d.ts",
+    "src/sql.js.d.ts",
+    "src/user-store.ts"
   ],
   "references": [
     {
@@ -34,6 +37,9 @@
     },
     {
       "path": "../../host/webserver"
+    },
+    {
+      "path": "../../util/home-paths"
     },
     {
       "path": "../../util/brand"

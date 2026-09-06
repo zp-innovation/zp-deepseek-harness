@@ -11,7 +11,7 @@
  * resizes are driven through the ResizeObserver stub.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { useSyncExternalStore } from 'react'
 import { AppFrame } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
 import type { AppFrameProps } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
@@ -323,6 +323,33 @@ describe('AppFrame', () => {
 })
 
 describe('AppFrame — narrow-viewport auto-collapse', () => {
+  it('uses the full viewport for conversation and exposes navigation as a drawer on phones', () => {
+    frameWidth = 400
+    const { frame, getByLabelText, slotCalls } = mountFrame()
+    expect(tracks(frame)).toEqual([0, 0])
+    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props)
+      .toMatchObject({ collapsed: true, width: 0, mobile: true })
+
+    fireEvent.click(getByLabelText('navigation.open'))
+    expect(frame.hasAttribute('data-sidebar-collapsed')).toBe(false)
+    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props)
+      .toMatchObject({ collapsed: false, width: 280, mobile: true })
+
+    fireEvent.click(getByLabelText('navigation.close'))
+    expect(frame.hasAttribute('data-sidebar-collapsed')).toBe(true)
+  })
+
+  it('opens details as a mobile drawer without narrowing the conversation', () => {
+    frameWidth = 400
+    const { frame, instance, getByLabelText } = mountFrame()
+    act(() => { instance.actions.openDetails() })
+    expect(tracks(frame)).toEqual([0, 0])
+    expect(frame.hasAttribute('data-mobile-details-open')).toBe(true)
+
+    fireEvent.click(getByLabelText('navigation.close'))
+    expect(frame.hasAttribute('data-mobile-details-open')).toBe(false)
+  })
+
   it('mounts collapsed below the breakpoint with no sidebar handle', () => {
     frameWidth = 980
     const { frame, slotCalls } = mountFrame()

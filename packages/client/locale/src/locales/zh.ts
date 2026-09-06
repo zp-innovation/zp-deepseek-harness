@@ -28,6 +28,8 @@ export const zh = {
   'collapse': '收起',
   'expand': '展开',
   'back': '返回',
+  'navigation.open': '打开导航',
+  'navigation.close': '关闭导航',
   'brand.localBuild': 'DSH 本地构建',
   'unknown': '未知',
   'none': '无',
