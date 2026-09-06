@@ -6,8 +6,7 @@
     "access": "public"
   },
   "repository": {
-    "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "type": "git+https://github.com/deepseek-ai/deepseek-harness.git",
     "directory": "packages/client/web"
   },
   "type": "module",
@@ -17,6 +16,10 @@
     ".": {
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
+    },
+    "./pwa": {
+      "types": "./lib/types/pwa.d.ts",
+      "default": "./lib/pwa.js"
     },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
@@ -41,6 +44,7 @@
   },
   "files": [
     "lib/index.js",
+    "lib/pwa.js",
     "lib/**/*.css",
     "lib/types/**/*.d.ts"
   ]

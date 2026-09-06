@@ -1,4 +1,4 @@
-import { glob, readFile } from 'node:fs/promises'
+﻿import { glob, readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
@@ -35,7 +35,7 @@ it('ships a favicon that switches to a light mark under dark color scheme', asyn
   expect(favicon).toContain('fill="#000"')
 })
 
-it('registers a Service Worker that caches static resources without caching login or API requests', async () => {
+it('registers a Service Worker that caches static resources and exposes a route-extension message API', async () => {
   const files: string[] = []
   for await (const file of glob(join(DIST_ROOT, 'assets', 'index-*.js'))) files.push(file)
   const entryFile = files[0]
@@ -44,10 +44,37 @@ it('registers a Service Worker that caches static resources without caching logi
   const entry = await readFile(entryFile, 'utf8')
   const worker = await readFile(join(DIST_ROOT, 'sw.js'), 'utf8')
 
-  expect(entry).toContain('serviceWorker.register("/sw.js",{scope:"/"})')
-  expect(worker).toContain("const CACHE_NAME = 'dsh-web-static-v1'")
-  expect(worker).toContain("const PRECACHE = ['/manifest.webmanifest', '/favicon.svg']")
+  expect(entry).toMatch(/serviceWorker\.register\(["']\/sw\.js["'],\s*\{\s*scope:\s*["']\/["']\s*\}\)/)
+  // Default cache: stale-while-revalidate over a versioned namespace.
+  expect(worker).toContain('dsh-web-static-v1')
+  expect(worker).toContain("PRECACHE")
+  // Default bypass for dynamic HTML, login, and Host API.
   expect(worker).toContain("url.pathname === '/login'")
   expect(worker).toContain("url.pathname.startsWith('/api/')")
-  expect(worker).toContain('return cached ?? refresh')
+  // Plugin-extensible: routes persisted across SW restarts, message handler
+  // accepts register/unregister/list/clear.
+  expect(worker).toContain('register-route')
+  expect(worker).toContain('unregister-route')
+  expect(worker).toContain('clear-cache')
+  expect(worker).toContain('cache-first')
+  expect(worker).toContain('network-first')
+  expect(worker).toContain('stale-while-revalidate')
+})
+
+it('exposes the route-registration API from the dsh-client-web package', async () => {
+  // The compiled artifact must carry the route API so plugins can import it
+  // by package name rather than reaching into apps/web source.
+  const files: string[] = []
+  for await (const file of glob(join(DIST_ROOT, 'assets', '*.js'))) files.push(file)
+  let found = false
+  for (const file of files) {
+    const text = await readFile(file, 'utf8')
+    if (text.includes('registerServiceWorkerRoute')
+      && text.includes('register-route')
+      && text.includes('cacheName')) {
+      found = true
+      break
+    }
+  }
+  expect(found).toBe(true)
 })

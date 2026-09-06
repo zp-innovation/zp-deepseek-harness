@@ -1,11 +1,16 @@
-/** Register the static-resource Service Worker for secure Web GUI origins. */
-export function registerPwa(): void {
-  if (!('serviceWorker' in navigator)) return
-  if (location.protocol !== 'https:' && location.hostname !== 'localhost') return
-
-  window.addEventListener('load', () => {
-    void navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((error: unknown) => {
-      console.warn('web app: could not register the offline asset cache', error)
-    })
-  }, { once: true })
-}
+﻿/**
+ * Thin re-export of the plugin-extensible Service Worker API so apps/web's
+ * entry can keep importing it from a relative path. The actual registration
+ * and route-management primitives live in `@deepseek-ai/dsh-client-web/pwa`
+ * so future plugins can import them by package name.
+ */
+export {
+  registerPwa,
+  registerServiceWorkerRoute,
+  unregisterServiceWorkerRoute,
+  listServiceWorkerRoutes,
+  clearServiceWorkerCache,
+  isSecurePwaContext,
+  type ServiceWorkerRouteConfig,
+  type ServiceWorkerStrategy,
+} from '@deepseek-ai/dsh-client-web'
